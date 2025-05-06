@@ -68,6 +68,12 @@ public:
         mDefaultStrides{},
         mTempSize(0) {}
 
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
+
+    Impl(Impl&&) = default;
+    Impl& operator=(Impl&&) = default;
+
     HRESULT Initialize(_In_reads_(nDecl) const InputElementDesc* vbDecl, size_t nDecl);
     HRESULT AddStream(_In_reads_bytes_(stride*nVerts) const void* vb, size_t nVerts, size_t inputSlot, size_t stride) noexcept;
     HRESULT Read(_Out_writes_(count) XMVECTOR* buffer, _In_z_ const char* semanticName, unsigned int semanticIndex, size_t count, bool x2bias) const;
@@ -223,55 +229,62 @@ HRESULT VBReader::Impl::AddStream(const void* vb, size_t nVerts, size_t inputSlo
 
 
 //-------------------------------------------------------------------------------------
-#define LOAD_VERTS(type, func) \
-    for (size_t icount = 0; icount < count; ++icount) { \
-        if ((ptr + sizeof(type)) > eptr) \
-            return E_UNEXPECTED; \
-        *buffer++ = func(reinterpret_cast<const type*>(ptr)); \
-        ptr += stride; \
-    } \
-    break;
+#define LOAD_VERTS( type, func )\
+        for(size_t icount = 0; icount < count; ++icount)\
+        {\
+            if ((ptr + sizeof(type)) > eptr)\
+                return E_UNEXPECTED;\
+            *buffer++ = func(reinterpret_cast<const type*>(ptr));\
+            ptr += stride;\
+        }\
+        break;
 
-#define LOAD_VERTS4_X2(type, func, x2bias) \
-    for (size_t icount = 0; icount < count; ++icount) { \
-        if ((ptr + sizeof(type)) > eptr) \
-            return E_UNEXPECTED; \
-        XMVECTOR v = func(reinterpret_cast<const type*>(ptr)); \
-        if (x2bias) { \
-            v = XMVectorMultiplyAdd(v, g_XMTwo, g_XMNegativeOne); \
-        } \
-        *buffer++ = v; \
-        ptr += stride; \
-    } \
-    break;
+#define LOAD_VERTS4_X2( type, func, x2bias )\
+        for(size_t icount = 0; icount < count; ++icount)\
+        {\
+            if ((ptr + sizeof(type)) > eptr)\
+                return E_UNEXPECTED;\
+            XMVECTOR v = func(reinterpret_cast<const type*>(ptr));\
+            if (x2bias)\
+            {\
+                v = XMVectorMultiplyAdd(v, g_XMTwo, g_XMNegativeOne);\
+            }\
+            *buffer++ = v;\
+            ptr += stride;\
+        }\
+        break;
 
-#define LOAD_VERTS3_X2(type, func, x2bias) \
-    for (size_t icount = 0; icount < count; ++icount) { \
-        if ((ptr + sizeof(type)) > eptr) \
-            return E_UNEXPECTED; \
-        XMVECTOR v = func(reinterpret_cast<const type*>(ptr)); \
-        if (x2bias) { \
-            const XMVECTOR v2 = XMVectorMultiplyAdd(v, g_XMTwo, g_XMNegativeOne); \
-            v = XMVectorSelect(v, v2, g_XMSelect1110); \
-        } \
-        *buffer++ = v; \
-        ptr += stride; \
-    } \
-    break;
+#define LOAD_VERTS3_X2( type, func, x2bias )\
+        for(size_t icount = 0; icount < count; ++icount)\
+        {\
+            if ((ptr + sizeof(type)) > eptr)\
+                return E_UNEXPECTED;\
+            XMVECTOR v = func(reinterpret_cast<const type*>(ptr));\
+            if (x2bias)\
+            {\
+                const XMVECTOR v2 = XMVectorMultiplyAdd(v, g_XMTwo, g_XMNegativeOne);\
+                v = XMVectorSelect(v, v2, g_XMSelect1110);\
+            }\
+            *buffer++ = v;\
+            ptr += stride;\
+        }\
+        break;
 
-#define LOAD_VERTS2_X2(type, func, x2bias) \
-    for (size_t icount = 0; icount < count; ++icount) { \
-        if ((ptr + sizeof(type)) > eptr) \
-            return E_UNEXPECTED; \
-        XMVECTOR v = func(reinterpret_cast<const type*>(ptr)); \
-        if (x2bias) { \
-            const XMVECTOR v2 = XMVectorMultiplyAdd(v, g_XMTwo, g_XMNegativeOne); \
-            v = XMVectorSelect(v, v2, g_XMSelect1100); \
-        } \
-        *buffer++ = v; \
-        ptr += stride; \
-    } \
-    break;
+#define LOAD_VERTS2_X2( type, func, x2bias )\
+        for(size_t icount = 0; icount < count; ++icount)\
+        {\
+            if ((ptr + sizeof(type)) > eptr)\
+                return E_UNEXPECTED;\
+            XMVECTOR v = func(reinterpret_cast<const type*>(ptr));\
+            if (x2bias)\
+            {\
+                const XMVECTOR v2 = XMVectorMultiplyAdd(v, g_XMTwo, g_XMNegativeOne);\
+                v = XMVectorSelect(v, v2, g_XMSelect1100);\
+            }\
+            *buffer++ = v;\
+            ptr += stride;\
+        }\
+        break;
 
 _Use_decl_annotations_
 HRESULT VBReader::Impl::Read(XMVECTOR* buffer, const char* semanticName, unsigned int semanticIndex, size_t count, bool x2bias) const
@@ -440,7 +453,7 @@ HRESULT VBReader::Impl::Read(XMVECTOR* buffer, const char* semanticName, unsigne
         {
             if ((ptr + sizeof(uint16_t)) > eptr)
                 return E_UNEXPECTED;
-            auto const i = *reinterpret_cast<const uint16_t*>(ptr);
+            const auto i = *reinterpret_cast<const uint16_t*>(ptr);
             float f = static_cast<float>(i) / 65535.f;
             if (x2bias)
             {
@@ -457,7 +470,7 @@ HRESULT VBReader::Impl::Read(XMVECTOR* buffer, const char* semanticName, unsigne
         {
             if ((ptr + sizeof(uint16_t)) > eptr)
                 return E_UNEXPECTED;
-            auto const i = *reinterpret_cast<const uint16_t*>(ptr);
+            const auto i = *reinterpret_cast<const uint16_t*>(ptr);
             *buffer++ = XMVectorSet(static_cast<float>(i), 0.f, 0.f, 0.f);
             ptr += stride;
         }
@@ -468,7 +481,7 @@ HRESULT VBReader::Impl::Read(XMVECTOR* buffer, const char* semanticName, unsigne
         {
             if ((ptr + sizeof(int16_t)) > eptr)
                 return E_UNEXPECTED;
-            auto const i = *reinterpret_cast<const int16_t*>(ptr);
+            const auto i = *reinterpret_cast<const int16_t*>(ptr);
             *buffer++ = XMVectorSet(static_cast<float>(i) / 32767.f, 0.f, 0.f, 0.f);
             ptr += stride;
         }
@@ -479,7 +492,7 @@ HRESULT VBReader::Impl::Read(XMVECTOR* buffer, const char* semanticName, unsigne
         {
             if ((ptr + sizeof(int16_t)) > eptr)
                 return E_UNEXPECTED;
-            auto const i = *reinterpret_cast<const int16_t*>(ptr);
+            const auto i = *reinterpret_cast<const int16_t*>(ptr);
             *buffer++ = XMVectorSet(static_cast<float>(i), 0.f, 0.f, 0.f);
             ptr += stride;
         }
@@ -518,7 +531,7 @@ HRESULT VBReader::Impl::Read(XMVECTOR* buffer, const char* semanticName, unsigne
         {
             if ((ptr + sizeof(int8_t)) > eptr)
                 return E_UNEXPECTED;
-            auto const i = *reinterpret_cast<const int8_t*>(ptr);
+            const auto i = *reinterpret_cast<const int8_t*>(ptr);
             *buffer++ = XMVectorSet(static_cast<float>(i) / 127.f, 0.f, 0.f, 0.f);
             ptr += stride;
         }
@@ -529,7 +542,7 @@ HRESULT VBReader::Impl::Read(XMVECTOR* buffer, const char* semanticName, unsigne
         {
             if ((ptr + sizeof(int8_t)) > eptr)
                 return E_UNEXPECTED;
-            auto const i = *reinterpret_cast<const int8_t*>(ptr);
+            const auto i = *reinterpret_cast<const int8_t*>(ptr);
             *buffer++ = XMVectorSet(static_cast<float>(i), 0.f, 0.f, 0.f);
             ptr += stride;
         }

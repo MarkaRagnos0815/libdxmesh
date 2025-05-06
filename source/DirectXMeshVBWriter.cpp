@@ -68,6 +68,12 @@ public:
         mDefaultStrides{},
         mTempSize(0) {}
 
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
+
+    Impl(Impl&&) = default;
+    Impl& operator=(Impl&&) = default;
+
     HRESULT Initialize(_In_reads_(nDecl) const InputElementDesc* vbDecl, size_t nDecl);
     HRESULT AddStream(_Out_writes_bytes_(stride*nVerts) void* vb, size_t nVerts, size_t inputSlot, size_t stride) noexcept;
     HRESULT Write(_In_reads_(count) const XMVECTOR* buffer, _In_z_ const char* semanticName, unsigned int semanticIndex, size_t count, bool x2bias) const;
@@ -222,28 +228,31 @@ HRESULT VBWriter::Impl::AddStream(void* vb, size_t nVerts, size_t inputSlot, siz
 
 
 //-------------------------------------------------------------------------------------
-#define STORE_VERTS(type, func) \
-    for (size_t icount = 0; icount < count; ++icount) { \
-        if ((ptr + sizeof(type)) > eptr) \
-            return E_UNEXPECTED; \
-        func(reinterpret_cast<type*>(ptr), *buffer++); \
-        ptr += stride; \
-    } \
-    break;
+#define STORE_VERTS( type, func )\
+        for(size_t icount = 0; icount < count; ++icount)\
+        {\
+            if ((ptr + sizeof(type)) > eptr)\
+                return E_UNEXPECTED;\
+            func(reinterpret_cast<type*>(ptr), *buffer++);\
+            ptr += stride;\
+        }\
+        break;
 
-#define STORE_VERTS_X2(type, func, x2bias) \
-    for (size_t icount = 0; icount < count; ++icount) { \
-        if ((ptr + sizeof(type)) > eptr) \
-            return E_UNEXPECTED; \
-        XMVECTOR v = *buffer++; \
-        if (x2bias) { \
-            v = XMVectorClamp(v, g_XMNegativeOne, g_XMOne); \
-            v = XMVectorMultiplyAdd(v, g_XMOneHalf, g_XMOneHalf); \
-        } \
-        func(reinterpret_cast<type*>(ptr), v); \
-        ptr += stride; \
-    } \
-    break;
+#define STORE_VERTS_X2( type, func, x2bias )\
+        for(size_t icount = 0; icount < count; ++icount)\
+        {\
+            if ((ptr + sizeof(type)) > eptr)\
+                return E_UNEXPECTED;\
+            XMVECTOR v = *buffer++;\
+            if (x2bias)\
+            {\
+                v = XMVectorClamp(v, g_XMNegativeOne, g_XMOne);\
+                v = XMVectorMultiplyAdd(v, g_XMOneHalf, g_XMOneHalf);\
+            }\
+            func(reinterpret_cast<type*>(ptr), v);\
+            ptr += stride;\
+        }\
+        break;
 
 _Use_decl_annotations_
 HRESULT VBWriter::Impl::Write(const XMVECTOR* buffer, const char* semanticName, unsigned int semanticIndex, size_t count, bool x2bias) const

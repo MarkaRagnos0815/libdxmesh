@@ -17,7 +17,15 @@ using namespace DirectX;
 // Entry-points
 //=====================================================================================
 
-_Use_decl_annotations_ HRESULT __cdecl DirectX::ConcatenateMesh(size_t nFaces, size_t nVerts, uint32_t* faceDestMap, uint32_t* vertexDestMap, size_t& totalFaces, size_t& totalVerts) noexcept {
+_Use_decl_annotations_
+HRESULT __cdecl DirectX::ConcatenateMesh(
+    size_t nFaces,
+    size_t nVerts,
+    uint32_t* faceDestMap,
+    uint32_t* vertexDestMap,
+    size_t& totalFaces,
+    size_t& totalVerts) noexcept
+{
     if (!nFaces || !nVerts || !faceDestMap || !vertexDestMap)
         return E_INVALIDARG;
 
@@ -33,13 +41,15 @@ _Use_decl_annotations_ HRESULT __cdecl DirectX::ConcatenateMesh(size_t nFaces, s
     if (newFaceCount >= UINT32_MAX || newVertCount >= UINT32_MAX)
         return E_FAIL;
 
-    auto const baseFace = static_cast<uint32_t>(totalFaces);
-    for (size_t j = 0; j < nFaces; ++j) {
+    const auto baseFace = static_cast<uint32_t>(totalFaces);
+    for (size_t j = 0; j < nFaces; ++j)
+    {
         faceDestMap[j] = baseFace + static_cast<uint32_t>(j);
     }
 
-    auto const baseVert = static_cast<uint32_t>(totalVerts);
-    for (size_t j = 0; j < nVerts; ++j) {
+    const auto baseVert = static_cast<uint32_t>(totalVerts);
+    for (size_t j = 0; j < nVerts; ++j)
+    {
         vertexDestMap[j] = baseVert + static_cast<uint32_t>(j);
     }
 

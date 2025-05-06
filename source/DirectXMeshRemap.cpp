@@ -13,343 +13,390 @@
 
 using namespace DirectX;
 
-namespace {
-constexpr size_t c_MaxStride = 2048;
+namespace
+{
+    constexpr size_t c_MaxStride = 2048;
 
 #if defined(__d3d11_h__) || defined(__d3d11_x_h__)
-static_assert(c_MaxStride == D3D11_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES, "D3D11 mismatch");
+    static_assert(c_MaxStride == D3D11_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES, "D3D11 mismatch");
 #endif
 
 #if defined(__d3d12_h__) || defined(__d3d12_x_h__) || defined(__XBOX_D3D12_X__)
-static_assert(c_MaxStride == D3D12_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES, "D3D12 mismatch");
+    static_assert(c_MaxStride == D3D12_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES, "D3D12 mismatch");
 #endif
 
-//---------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------
+#ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable : 6101)
+#pragma warning( disable : 6101 )
+#endif
 
-template <class index_t>
-HRESULT ReorderFaces(
-    _In_reads_(nFaces * 3) const index_t* ibin,
-    _In_ size_t nFaces,
-    _In_reads_opt_(nFaces * 3) const uint32_t* adjin,
-    _In_reads_(nFaces) const uint32_t* faceRemap,
-    _Out_writes_(nFaces * 3) index_t* ibout,
-    _Out_writes_opt_(nFaces * 3) uint32_t* adjout) noexcept {
-    assert(ibin != nullptr && faceRemap != nullptr && ibout != nullptr && ibin != ibout);
-    _Analysis_assume_(ibin != nullptr && faceRemap != nullptr && ibout != nullptr && ibin != ibout);
+    template<class index_t>
+    HRESULT ReorderFaces(
+        _In_reads_(nFaces * 3) const index_t* ibin, _In_ size_t nFaces,
+        _In_reads_opt_(nFaces * 3) const uint32_t* adjin,
+        _In_reads_(nFaces) const uint32_t* faceRemap,
+        _Out_writes_(nFaces * 3) index_t* ibout,
+        _Out_writes_opt_(nFaces * 3) uint32_t* adjout) noexcept
+    {
+        assert(ibin != nullptr && faceRemap != nullptr && ibout != nullptr && ibin != ibout);
+        _Analysis_assume_(ibin != nullptr && faceRemap != nullptr && ibout != nullptr && ibin != ibout);
 
-    assert((!adjin && !adjout) || ((adjin && adjout) && adjin != adjout));
-    _Analysis_assume_((!adjin && !adjout) || ((adjin && adjout) && adjin != adjout));
+        assert((!adjin && !adjout) || ((adjin && adjout) && adjin != adjout));
+        _Analysis_assume_((!adjin && !adjout) || ((adjin && adjout) && adjin != adjout));
 
-    for (size_t j = 0; j < nFaces; ++j) {
-        const uint32_t src = faceRemap[j];
+        for (size_t j = 0; j < nFaces; ++j)
+        {
+            const uint32_t src = faceRemap[j];
 
-        if (src == UNUSED32)
-            continue;
+            if (src == UNUSED32)
+                continue;
 
-        if (src < nFaces) {
-            ibout[j * 3] = ibin[src * 3];
-            ibout[j * 3 + 1] = ibin[src * 3 + 1];
-            ibout[j * 3 + 2] = ibin[src * 3 + 2];
+            if (src < nFaces)
+            {
+                ibout[j * 3] = ibin[src * 3];
+                ibout[j * 3 + 1] = ibin[src * 3 + 1];
+                ibout[j * 3 + 2] = ibin[src * 3 + 2];
 
-            if (adjin && adjout) {
-                adjout[j * 3] = adjin[src * 3];
-                adjout[j * 3 + 1] = adjin[src * 3 + 1];
-                adjout[j * 3 + 2] = adjin[src * 3 + 2];
+                if (adjin && adjout)
+                {
+                    adjout[j * 3] = adjin[src * 3];
+                    adjout[j * 3 + 1] = adjin[src * 3 + 1];
+                    adjout[j * 3 + 2] = adjin[src * 3 + 2];
+                }
             }
-        } else
-            return E_FAIL;
-    }
-
-    return S_OK;
-}
-
-#pragma warning(pop)
-
-//---------------------------------------------------------------------------------
-template <class index_t>
-HRESULT SwapFaces(_Inout_updates_all_(nFaces * 3) index_t* ib, _In_ size_t nFaces, _Inout_updates_all_opt_(nFaces * 3) uint32_t* adj, _In_reads_(nFaces) const uint32_t* faceRemap) noexcept {
-    assert(ib != nullptr && faceRemap != nullptr);
-    _Analysis_assume_(ib != nullptr && faceRemap != nullptr);
-
-    std::unique_ptr<uint8_t[]> temp(new (std::nothrow) uint8_t[(sizeof(bool) + sizeof(uint32_t)) * nFaces]);
-    if (!temp)
-        return E_OUTOFMEMORY;
-
-    auto faceRemapInverse = reinterpret_cast<uint32_t*>(temp.get());
-
-    memset(faceRemapInverse, 0xff, sizeof(uint32_t) * nFaces);
-
-    for (uint32_t j = 0; j < nFaces; ++j) {
-        if (faceRemap[j] != UNUSED32) {
-            if (faceRemap[j] >= nFaces)
-                return E_UNEXPECTED;
-
-            faceRemapInverse[faceRemap[j]] = j;
+            else
+                return E_FAIL;
         }
+
+        return S_OK;
     }
 
-    auto moved = reinterpret_cast<bool*>(temp.get() + sizeof(uint32_t) * nFaces);
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
-    memset(moved, 0, sizeof(bool) * nFaces);
+    //---------------------------------------------------------------------------------
+    template<class index_t>
+    HRESULT SwapFaces(
+        _Inout_updates_all_(nFaces * 3) index_t* ib, _In_ size_t nFaces,
+        _Inout_updates_all_opt_(nFaces * 3) uint32_t* adj,
+        _In_reads_(nFaces) const uint32_t* faceRemap) noexcept
+    {
+        assert(ib != nullptr && faceRemap != nullptr);
+        _Analysis_assume_(ib != nullptr && faceRemap != nullptr);
 
-    for (size_t j = 0; j < nFaces; ++j) {
-        if (moved[j])
-            continue;
+        std::unique_ptr<uint8_t[]> temp(new (std::nothrow) uint8_t[(sizeof(bool) + sizeof(uint32_t)) * nFaces]);
+        if (!temp)
+            return E_OUTOFMEMORY;
 
-        uint32_t dest = faceRemapInverse[j];
+        auto faceRemapInverse = reinterpret_cast<uint32_t*>(temp.get());
 
-        if (dest == UNUSED32)
-            continue;
+        memset(faceRemapInverse, 0xff, sizeof(uint32_t) * nFaces);
 
-        if (dest >= nFaces)
-            return E_FAIL;
+        for (uint32_t j = 0; j < nFaces; ++j)
+        {
+            if (faceRemap[j] != UNUSED32)
+            {
+                if (faceRemap[j] >= nFaces)
+                    return E_UNEXPECTED;
 
-        while (dest != j) {
-            // Swap face
-            index_t i0 = ib[dest * 3];
-            index_t i1 = ib[dest * 3 + 1];
-            index_t i2 = ib[dest * 3 + 2];
-
-            ib[dest * 3] = ib[j * 3];
-            ib[dest * 3 + 1] = ib[j * 3 + 1];
-            ib[dest * 3 + 2] = ib[j * 3 + 2];
-
-            ib[j * 3] = i0;
-            ib[j * 3 + 1] = i1;
-            ib[j * 3 + 2] = i2;
-
-            if (adj) {
-                const uint32_t a0 = adj[dest * 3];
-                const uint32_t a1 = adj[dest * 3 + 1];
-                const uint32_t a2 = adj[dest * 3 + 2];
-
-                adj[dest * 3] = adj[j * 3];
-                adj[dest * 3 + 1] = adj[j * 3 + 1];
-                adj[dest * 3 + 2] = adj[j * 3 + 2];
-
-                adj[j * 3] = a0;
-                adj[j * 3 + 1] = a1;
-                adj[j * 3 + 2] = a2;
+                faceRemapInverse[faceRemap[j]] = j;
             }
+        }
 
-            moved[dest] = true;
+        auto moved = reinterpret_cast<bool*>(temp.get() + sizeof(uint32_t) * nFaces);
 
-            dest = faceRemapInverse[dest];
+        memset(moved, 0, sizeof(bool) * nFaces);
 
-            if (dest == UNUSED32 || moved[dest])
-                break;
+        for (size_t j = 0; j < nFaces; ++j)
+        {
+            if (moved[j])
+                continue;
+
+            uint32_t dest = faceRemapInverse[j];
+
+            if (dest == UNUSED32)
+                continue;
 
             if (dest >= nFaces)
                 return E_FAIL;
-        }
-    }
 
-    return S_OK;
-}
+            while (dest != j)
+            {
+                // Swap face
+                index_t i0 = ib[dest * 3];
+                index_t i1 = ib[dest * 3 + 1];
+                index_t i2 = ib[dest * 3 + 2];
 
-//---------------------------------------------------------------------------------
-HRESULT SwapVertices(
-    _Inout_updates_bytes_all_(nVerts* stride) void* vb,
-    size_t stride,
-    size_t nVerts,
-    _Inout_updates_all_opt_(nVerts) uint32_t* pointRep,
-    _In_reads_(nVerts) const uint32_t* vertexRemap) noexcept {
-    if (!vb || !stride || !nVerts || !vertexRemap)
-        return E_INVALIDARG;
+                ib[dest * 3] = ib[j * 3];
+                ib[dest * 3 + 1] = ib[j * 3 + 1];
+                ib[dest * 3 + 2] = ib[j * 3 + 2];
 
-    if (stride > c_MaxStride)
-        return E_INVALIDARG;
+                ib[j * 3] = i0;
+                ib[j * 3 + 1] = i1;
+                ib[j * 3 + 2] = i2;
 
-    std::unique_ptr<uint8_t[]> temp(new (std::nothrow) uint8_t[((sizeof(bool) + sizeof(uint32_t)) * nVerts) + stride]);
-    if (!temp)
-        return E_OUTOFMEMORY;
+                if (adj)
+                {
+                    const uint32_t a0 = adj[dest * 3];
+                    const uint32_t a1 = adj[dest * 3 + 1];
+                    const uint32_t a2 = adj[dest * 3 + 2];
 
-    auto vertexRemapInverse = reinterpret_cast<uint32_t*>(temp.get());
+                    adj[dest * 3] = adj[j * 3];
+                    adj[dest * 3 + 1] = adj[j * 3 + 1];
+                    adj[dest * 3 + 2] = adj[j * 3 + 2];
 
-    memset(vertexRemapInverse, 0xff, sizeof(uint32_t) * nVerts);
-
-    for (uint32_t j = 0; j < nVerts; ++j) {
-        if (vertexRemap[j] != UNUSED32) {
-            if (vertexRemap[j] >= nVerts)
-                return E_UNEXPECTED;
-
-            vertexRemapInverse[vertexRemap[j]] = j;
-        }
-    }
-
-    auto moved = reinterpret_cast<bool*>(temp.get() + sizeof(uint32_t) * nVerts);
-    memset(moved, 0, sizeof(bool) * nVerts);
-
-    auto vbtemp = temp.get() + ((sizeof(bool) + sizeof(uint32_t)) * nVerts);
-
-    auto ptr = static_cast<uint8_t*>(vb);
-
-    for (size_t j = 0; j < nVerts; ++j) {
-        if (moved[j])
-            continue;
-
-        uint32_t dest = vertexRemapInverse[j];
-
-        if (dest == UNUSED32)
-            continue;
-
-        if (dest >= nVerts)
-            return E_UNEXPECTED;
-
-        bool next = false;
-
-        while (dest != j) {
-            // Swap vertex
-#ifdef _PREFAST_
-#pragma prefast(push)
-#pragma prefast(disable : 26019, "PREfast noise: Esp:1307")
-#endif
-            memcpy(vbtemp, ptr + dest * stride, stride);
-            memcpy(ptr + dest * stride, ptr + j * stride, stride);
-            memcpy(ptr + j * stride, vbtemp, stride);
-#ifdef _PREFAST_
-#pragma prefast(pop)
-#endif
-
-            if (pointRep) {
-                std::swap(pointRep[dest], pointRep[j]);
-                // Remap
-                const uint32_t pr = pointRep[dest];
-                if (pr < nVerts) {
-                    pointRep[dest] = vertexRemapInverse[pr];
+                    adj[j * 3] = a0;
+                    adj[j * 3 + 1] = a1;
+                    adj[j * 3 + 2] = a2;
                 }
+
+                moved[dest] = true;
+
+                dest = faceRemapInverse[dest];
+
+                if (dest == UNUSED32 || moved[dest])
+                    break;
+
+                if (dest >= nFaces)
+                    return E_FAIL;
             }
+        }
 
-            moved[dest] = true;
+        return S_OK;
+    }
 
-            dest = vertexRemapInverse[dest];
 
-            if (dest == UNUSED32 || moved[dest]) {
-                next = true;
-                break;
+    //---------------------------------------------------------------------------------
+    HRESULT SwapVertices(
+        _Inout_updates_bytes_all_(nVerts*stride) void* vb, size_t stride, size_t nVerts,
+        _Inout_updates_all_opt_(nVerts) uint32_t* pointRep, _In_reads_(nVerts) const uint32_t* vertexRemap) noexcept
+    {
+        if (!vb || !stride || !nVerts || !vertexRemap)
+            return E_INVALIDARG;
+
+        if (stride > c_MaxStride)
+            return E_INVALIDARG;
+
+        std::unique_ptr<uint8_t[]> temp(new (std::nothrow) uint8_t[((sizeof(bool) + sizeof(uint32_t)) * nVerts) + stride]);
+        if (!temp)
+            return E_OUTOFMEMORY;
+
+        auto vertexRemapInverse = reinterpret_cast<uint32_t*>(temp.get());
+
+        memset(vertexRemapInverse, 0xff, sizeof(uint32_t) * nVerts);
+
+        for (uint32_t j = 0; j < nVerts; ++j)
+        {
+            if (vertexRemap[j] != UNUSED32)
+            {
+                if (vertexRemap[j] >= nVerts)
+                    return E_UNEXPECTED;
+
+                vertexRemapInverse[vertexRemap[j]] = j;
             }
+        }
+
+        auto moved = reinterpret_cast<bool*>(temp.get() + sizeof(uint32_t) * nVerts);
+        memset(moved, 0, sizeof(bool) * nVerts);
+
+        auto vbtemp = temp.get() + ((sizeof(bool) + sizeof(uint32_t)) * nVerts);
+
+        auto ptr = static_cast<uint8_t*>(vb);
+
+        for (size_t j = 0; j < nVerts; ++j)
+        {
+            if (moved[j])
+                continue;
+
+            uint32_t dest = vertexRemapInverse[j];
+
+            if (dest == UNUSED32)
+                continue;
 
             if (dest >= nVerts)
+                return E_UNEXPECTED;
+
+            bool next = false;
+
+            while (dest != j)
+            {
+                // Swap vertex
+            #ifdef _PREFAST_
+            #pragma prefast(push)
+            #pragma prefast(disable : 26019, "PREfast noise: Esp:1307")
+            #endif
+                memcpy(vbtemp, ptr + dest*stride, stride);
+                memcpy(ptr + dest*stride, ptr + j*stride, stride);
+                memcpy(ptr + j*stride, vbtemp, stride);
+            #ifdef _PREFAST_
+            #pragma prefast(pop)
+            #endif
+
+                if (pointRep)
+                {
+                    std::swap(pointRep[dest], pointRep[j]);
+                    // Remap
+                    const uint32_t pr = pointRep[dest];
+                    if (pr < nVerts)
+                    {
+                        pointRep[dest] = vertexRemapInverse[pr];
+                    }
+                }
+
+                moved[dest] = true;
+
+                dest = vertexRemapInverse[dest];
+
+                if (dest == UNUSED32 || moved[dest])
+                {
+                    next = true;
+                    break;
+                }
+
+                if (dest >= nVerts)
+                    return E_FAIL;
+            }
+
+            if (next)
+                continue;
+
+            if (pointRep)
+            {
+                // Remap
+                const uint32_t pr = pointRep[j];
+                if (pr < nVerts)
+                {
+                    pointRep[j] = vertexRemapInverse[pr];
+                }
+            }
+        }
+
+        return S_OK;
+    }
+
+
+    //---------------------------------------------------------------------------------
+    template<class index_t>
+    HRESULT FinalizeIBImpl(
+        _In_reads_(nFaces * 3) const index_t* ibin, size_t nFaces,
+        _In_reads_(nVerts) const uint32_t* vertexRemap, size_t nVerts,
+        _Out_writes_(nFaces * 3) index_t* ibout) noexcept
+    {
+        if (!ibin || !nFaces || !vertexRemap || !nVerts || !ibout)
+            return E_INVALIDARG;
+
+        if ((uint64_t(nFaces) * 3) >= UINT32_MAX)
+            return HRESULT_E_ARITHMETIC_OVERFLOW;
+
+        if (nVerts >= index_t(-1))
+            return E_INVALIDARG;
+
+        std::unique_ptr<uint32_t[]> vertexRemapInverse(new (std::nothrow) uint32_t[nVerts]);
+        if (!vertexRemapInverse)
+            return E_OUTOFMEMORY;
+
+        memset(vertexRemapInverse.get(), 0xff, sizeof(uint32_t) * nVerts);
+
+        for (uint32_t j = 0; j < nVerts; ++j)
+        {
+            if (vertexRemap[j] != UNUSED32)
+            {
+                if (vertexRemap[j] >= nVerts)
+                    return E_UNEXPECTED;
+
+                vertexRemapInverse[vertexRemap[j]] = j;
+            }
+        }
+
+        for (size_t j = 0; j < (nFaces * 3); ++j)
+        {
+            index_t i = ibin[j];
+            if (i == index_t(-1))
+            {
+                ibout[j] = index_t(-1);
+                continue;
+            }
+
+            if (i >= nVerts)
+                return E_UNEXPECTED;
+
+            const uint32_t dest = vertexRemapInverse[i];
+            if (dest == UNUSED32)
+            {
+                ibout[j] = i;
+                continue;
+            }
+
+            if (dest < nVerts)
+            {
+                ibout[j] = index_t(dest);
+            }
+            else
                 return E_FAIL;
         }
 
-        if (next)
-            continue;
+        return S_OK;
+    }
 
-        if (pointRep) {
-            // Remap
-            const uint32_t pr = pointRep[j];
-            if (pr < nVerts) {
-                pointRep[j] = vertexRemapInverse[pr];
+
+    //---------------------------------------------------------------------------------
+    template<class index_t>
+    HRESULT FinalizeIBImpl(
+        _Inout_updates_all_(nFaces * 3) index_t* ib, size_t nFaces,
+        _In_reads_(nVerts) const uint32_t* vertexRemap, size_t nVerts) noexcept
+    {
+        if (!ib || !nFaces || !vertexRemap || !nVerts)
+            return E_INVALIDARG;
+
+        if ((uint64_t(nFaces) * 3) >= UINT32_MAX)
+            return HRESULT_E_ARITHMETIC_OVERFLOW;
+
+        if (nVerts >= index_t(-1))
+            return E_INVALIDARG;
+
+        std::unique_ptr<uint32_t[]> vertexRemapInverse(new (std::nothrow) uint32_t[nVerts]);
+        if (!vertexRemapInverse)
+            return E_OUTOFMEMORY;
+
+        memset(vertexRemapInverse.get(), 0xff, sizeof(uint32_t) * nVerts);
+
+        for (uint32_t j = 0; j < nVerts; ++j)
+        {
+            if (vertexRemap[j] != UNUSED32)
+            {
+                if (vertexRemap[j] >= nVerts)
+                    return E_UNEXPECTED;
+
+                vertexRemapInverse[vertexRemap[j]] = j;
             }
         }
-    }
 
-    return S_OK;
-}
+        for (size_t j = 0; j < (nFaces * 3); ++j)
+        {
+            index_t i = ib[j];
+            if (i == index_t(-1))
+                continue;
 
-//---------------------------------------------------------------------------------
-template <class index_t>
-HRESULT FinalizeIBImpl(_In_reads_(nFaces * 3) const index_t* ibin, size_t nFaces, _In_reads_(nVerts) const uint32_t* vertexRemap, size_t nVerts, _Out_writes_(nFaces * 3) index_t* ibout) noexcept {
-    if (!ibin || !nFaces || !vertexRemap || !nVerts || !ibout)
-        return E_INVALIDARG;
-
-    if ((uint64_t(nFaces) * 3) >= UINT32_MAX)
-        return HRESULT_E_ARITHMETIC_OVERFLOW;
-
-    if (nVerts >= index_t(-1))
-        return E_INVALIDARG;
-
-    std::unique_ptr<uint32_t[]> vertexRemapInverse(new (std::nothrow) uint32_t[nVerts]);
-    if (!vertexRemapInverse)
-        return E_OUTOFMEMORY;
-
-    memset(vertexRemapInverse.get(), 0xff, sizeof(uint32_t) * nVerts);
-
-    for (uint32_t j = 0; j < nVerts; ++j) {
-        if (vertexRemap[j] != UNUSED32) {
-            if (vertexRemap[j] >= nVerts)
+            if (i >= nVerts)
                 return E_UNEXPECTED;
 
-            vertexRemapInverse[vertexRemap[j]] = j;
+            const uint32_t dest = vertexRemapInverse[i];
+            if (dest == UNUSED32)
+                continue;
+
+            if (dest < nVerts)
+            {
+                ib[j] = index_t(dest);
+            }
+            else
+                return E_FAIL;
         }
+
+        return S_OK;
     }
-
-    for (size_t j = 0; j < (nFaces * 3); ++j) {
-        index_t i = ibin[j];
-        if (i == index_t(-1)) {
-            ibout[j] = index_t(-1);
-            continue;
-        }
-
-        if (i >= nVerts)
-            return E_UNEXPECTED;
-
-        const uint32_t dest = vertexRemapInverse[i];
-        if (dest == UNUSED32) {
-            ibout[j] = i;
-            continue;
-        }
-
-        if (dest < nVerts) {
-            ibout[j] = index_t(dest);
-        } else
-            return E_FAIL;
-    }
-
-    return S_OK;
 }
-
-//---------------------------------------------------------------------------------
-template <class index_t>
-HRESULT FinalizeIBImpl(_Inout_updates_all_(nFaces * 3) index_t* ib, size_t nFaces, _In_reads_(nVerts) const uint32_t* vertexRemap, size_t nVerts) noexcept {
-    if (!ib || !nFaces || !vertexRemap || !nVerts)
-        return E_INVALIDARG;
-
-    if ((uint64_t(nFaces) * 3) >= UINT32_MAX)
-        return HRESULT_E_ARITHMETIC_OVERFLOW;
-
-    if (nVerts >= index_t(-1))
-        return E_INVALIDARG;
-
-    std::unique_ptr<uint32_t[]> vertexRemapInverse(new (std::nothrow) uint32_t[nVerts]);
-    if (!vertexRemapInverse)
-        return E_OUTOFMEMORY;
-
-    memset(vertexRemapInverse.get(), 0xff, sizeof(uint32_t) * nVerts);
-
-    for (uint32_t j = 0; j < nVerts; ++j) {
-        if (vertexRemap[j] != UNUSED32) {
-            if (vertexRemap[j] >= nVerts)
-                return E_UNEXPECTED;
-
-            vertexRemapInverse[vertexRemap[j]] = j;
-        }
-    }
-
-    for (size_t j = 0; j < (nFaces * 3); ++j) {
-        index_t i = ib[j];
-        if (i == index_t(-1))
-            continue;
-
-        if (i >= nVerts)
-            return E_UNEXPECTED;
-
-        const uint32_t dest = vertexRemapInverse[i];
-        if (dest == UNUSED32)
-            continue;
-
-        if (dest < nVerts) {
-            ib[j] = index_t(dest);
-        } else
-            return E_FAIL;
-    }
-
-    return S_OK;
-}
-}  // namespace
 
 //=====================================================================================
 // Entry-points
@@ -358,7 +405,13 @@ HRESULT FinalizeIBImpl(_Inout_updates_all_(nFaces * 3) index_t* ib, size_t nFace
 //-------------------------------------------------------------------------------------
 // Applies a face remap reordering to an index buffer
 //-------------------------------------------------------------------------------------
-_Use_decl_annotations_ HRESULT DirectX::ReorderIB(const uint16_t* ibin, size_t nFaces, const uint32_t* faceRemap, uint16_t* ibout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIB(
+    const uint16_t* ibin,
+    size_t nFaces,
+    const uint32_t* faceRemap,
+    uint16_t* ibout) noexcept
+{
     if (!ibin || !nFaces || !faceRemap || !ibout)
         return E_INVALIDARG;
 
@@ -371,7 +424,12 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIB(const uint16_t* ibin, size_t n
     return ReorderFaces<uint16_t>(ibin, nFaces, nullptr, faceRemap, ibout, nullptr);
 }
 
-_Use_decl_annotations_ HRESULT DirectX::ReorderIB(uint16_t* ib, size_t nFaces, const uint32_t* faceRemap) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIB(
+    uint16_t* ib,
+    size_t nFaces,
+    const uint32_t* faceRemap) noexcept
+{
     if (!ib || !nFaces || !faceRemap)
         return E_INVALIDARG;
 
@@ -381,8 +439,15 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIB(uint16_t* ib, size_t nFaces, c
     return SwapFaces<uint16_t>(ib, nFaces, nullptr, faceRemap);
 }
 
+
 //-------------------------------------------------------------------------------------
-_Use_decl_annotations_ HRESULT DirectX::ReorderIB(const uint32_t* ibin, size_t nFaces, const uint32_t* faceRemap, uint32_t* ibout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIB(
+    const uint32_t* ibin,
+    size_t nFaces,
+    const uint32_t* faceRemap,
+    uint32_t* ibout) noexcept
+{
     if (!ibin || !nFaces || !faceRemap || !ibout)
         return E_INVALIDARG;
 
@@ -395,7 +460,12 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIB(const uint32_t* ibin, size_t n
     return ReorderFaces<uint32_t>(ibin, nFaces, nullptr, faceRemap, ibout, nullptr);
 }
 
-_Use_decl_annotations_ HRESULT DirectX::ReorderIB(uint32_t* ib, size_t nFaces, const uint32_t* faceRemap) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIB(
+    uint32_t* ib,
+    size_t nFaces,
+    const uint32_t* faceRemap) noexcept
+{
     if (!ib || !nFaces || !faceRemap)
         return E_INVALIDARG;
 
@@ -405,10 +475,19 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIB(uint32_t* ib, size_t nFaces, c
     return SwapFaces<uint32_t>(ib, nFaces, nullptr, faceRemap);
 }
 
+
 //-------------------------------------------------------------------------------------
 // Applies a face remap reordering to an index buffer and adjacency
 //-------------------------------------------------------------------------------------
-_Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(const uint16_t* ibin, size_t nFaces, const uint32_t* adjin, const uint32_t* faceRemap, uint16_t* ibout, uint32_t* adjout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIBAndAdjacency(
+    const uint16_t* ibin,
+    size_t nFaces,
+    const uint32_t* adjin,
+    const uint32_t* faceRemap,
+    uint16_t* ibout,
+    uint32_t* adjout) noexcept
+{
     if (!ibin || !nFaces || !adjin || !faceRemap || !ibout || !adjout)
         return E_INVALIDARG;
 
@@ -421,7 +500,13 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(const uint16_t* ib
     return ReorderFaces<uint16_t>(ibin, nFaces, adjin, faceRemap, ibout, adjout);
 }
 
-_Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(uint16_t* ib, size_t nFaces, uint32_t* adj, const uint32_t* faceRemap) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIBAndAdjacency(
+    uint16_t* ib,
+    size_t nFaces,
+    uint32_t* adj,
+    const uint32_t* faceRemap) noexcept
+{
     if (!ib || !nFaces || !adj || !faceRemap)
         return E_INVALIDARG;
 
@@ -431,8 +516,17 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(uint16_t* ib, size
     return SwapFaces<uint16_t>(ib, nFaces, adj, faceRemap);
 }
 
+
 //-------------------------------------------------------------------------------------
-_Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(const uint32_t* ibin, size_t nFaces, const uint32_t* adjin, const uint32_t* faceRemap, uint32_t* ibout, uint32_t* adjout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIBAndAdjacency(
+    const uint32_t* ibin,
+    size_t nFaces,
+    const uint32_t* adjin,
+    const uint32_t* faceRemap,
+    uint32_t* ibout,
+    uint32_t* adjout) noexcept
+{
     if (!ibin || !nFaces || !adjin || !faceRemap || !ibout || !adjout)
         return E_INVALIDARG;
 
@@ -445,7 +539,13 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(const uint32_t* ib
     return ReorderFaces<uint32_t>(ibin, nFaces, adjin, faceRemap, ibout, adjout);
 }
 
-_Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(uint32_t* ib, size_t nFaces, uint32_t* adj, const uint32_t* faceRemap) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::ReorderIBAndAdjacency(
+    uint32_t* ib,
+    size_t nFaces,
+    uint32_t* adj,
+    const uint32_t* faceRemap) noexcept
+{
     if (!ib || !nFaces || !adj || !faceRemap)
         return E_INVALIDARG;
 
@@ -455,33 +555,73 @@ _Use_decl_annotations_ HRESULT DirectX::ReorderIBAndAdjacency(uint32_t* ib, size
     return SwapFaces<uint32_t>(ib, nFaces, adj, faceRemap);
 }
 
+
 //-------------------------------------------------------------------------------------
 // Applies a vertex remap, filling out a new index buffer
 //-------------------------------------------------------------------------------------
-_Use_decl_annotations_ HRESULT DirectX::FinalizeIB(const uint16_t* ibin, size_t nFaces, const uint32_t* vertexRemap, size_t nVerts, uint16_t* ibout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeIB(
+    const uint16_t* ibin,
+    size_t nFaces,
+    const uint32_t* vertexRemap,
+    size_t nVerts,
+    uint16_t* ibout) noexcept
+{
     return FinalizeIBImpl<uint16_t>(ibin, nFaces, vertexRemap, nVerts, ibout);
 }
 
-_Use_decl_annotations_ HRESULT DirectX::FinalizeIB(uint16_t* ib, size_t nFaces, const uint32_t* vertexRemap, size_t nVerts) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeIB(
+    uint16_t* ib,
+    size_t nFaces,
+    const uint32_t* vertexRemap,
+    size_t nVerts) noexcept
+{
     return FinalizeIBImpl<uint16_t>(ib, nFaces, vertexRemap, nVerts);
 }
 
+
 //-------------------------------------------------------------------------------------
-_Use_decl_annotations_ HRESULT DirectX::FinalizeIB(const uint32_t* ibin, size_t nFaces, const uint32_t* vertexRemap, size_t nVerts, uint32_t* ibout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeIB(
+    const uint32_t* ibin,
+    size_t nFaces,
+    const uint32_t* vertexRemap,
+    size_t nVerts,
+    uint32_t* ibout) noexcept
+{
     return FinalizeIBImpl<uint32_t>(ibin, nFaces, vertexRemap, nVerts, ibout);
 }
 
-_Use_decl_annotations_ HRESULT DirectX::FinalizeIB(uint32_t* ib, size_t nFaces, const uint32_t* vertexRemap, size_t nVerts) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeIB(
+    uint32_t* ib,
+    size_t nFaces,
+    const uint32_t* vertexRemap,
+    size_t nVerts) noexcept
+{
     return FinalizeIBImpl<uint32_t>(ib, nFaces, vertexRemap, nVerts);
 }
+
 
 //-------------------------------------------------------------------------------------
 // Applies a vertex remap and/or a vertex duplication set to a vertex buffer
 //-------------------------------------------------------------------------------------
+#ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable : 6101)
+#pragma warning( disable : 6101 )
+#endif
 
-_Use_decl_annotations_ HRESULT DirectX::FinalizeVB(const void* vbin, size_t stride, size_t nVerts, const uint32_t* dupVerts, size_t nDupVerts, const uint32_t* vertexRemap, void* vbout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeVB(
+    const void* vbin,
+    size_t stride,
+    size_t nVerts,
+    const uint32_t* dupVerts,
+    size_t nDupVerts,
+    const uint32_t* vertexRemap,
+    void* vbout) noexcept
+{
     if (!vbin || !stride || !nVerts || !vbout)
         return E_INVALIDARG;
 
@@ -507,6 +647,8 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVB(const void* vbin, size_t stri
         return HRESULT_E_NOT_SUPPORTED;
 
     const size_t newVerts = nVerts + nDupVerts;
+    if (!newVerts)
+        return E_INVALIDARG;
 
     auto sptr = static_cast<const uint8_t*>(vbin);
     auto dptr = static_cast<uint8_t*>(vbout);
@@ -515,19 +657,28 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVB(const void* vbin, size_t stri
     memset(vbout, 0, newVerts * stride);
 #endif
 
-    for (size_t j = 0; j < newVerts; ++j) {
+    for (size_t j = 0; j < newVerts; ++j)
+    {
         const uint32_t src = (vertexRemap) ? vertexRemap[j] : uint32_t(j);
 
-        if (src == UNUSED32) {
+        if (src == UNUSED32)
+        {
             // remap entry is unused
-        } else if (src >= newVerts) {
+        }
+        else if (src >= newVerts)
+        {
             return E_FAIL;
-        } else if (src < nVerts) {
+        }
+        else if (src < nVerts)
+        {
             memcpy(dptr, sptr + src * stride, stride);
-        } else if (dupVerts) {
+        }
+        else if (dupVerts)
+        {
             const uint32_t dup = dupVerts[src - nVerts];
             memcpy(dptr, sptr + dup * stride, stride);
-        } else
+        }
+        else
             return E_FAIL;
 
         dptr += stride;
@@ -536,23 +687,35 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVB(const void* vbin, size_t stri
     return S_OK;
 }
 
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
-_Use_decl_annotations_ HRESULT DirectX::FinalizeVB(void* vb, size_t stride, size_t nVerts, const uint32_t* vertexRemap) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeVB(
+    void* vb,
+    size_t stride,
+    size_t nVerts,
+    const uint32_t* vertexRemap) noexcept
+{
     if (nVerts >= UINT32_MAX)
         return E_INVALIDARG;
 
     return SwapVertices(vb, stride, nVerts, nullptr, vertexRemap);
 }
 
+
 //-------------------------------------------------------------------------------------
 // Applies a vertex remap and/or a vertex duplication set to a vertex buffer and
 // point representatives
 //-------------------------------------------------------------------------------------
+#ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable : 6101)
+#pragma warning( disable : 6101 )
+#endif
 
-_Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeVBAndPointReps(
     const void* vbin,
     size_t stride,
     size_t nVerts,
@@ -561,7 +724,8 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(
     size_t nDupVerts,
     const uint32_t* vertexRemap,
     void* vbout,
-    uint32_t* prout) noexcept {
+    uint32_t* prout) noexcept
+{
     if (!vbin || !stride || !nVerts || !prin || !vbout || !prout)
         return E_INVALIDARG;
 
@@ -587,17 +751,22 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(
         return HRESULT_E_NOT_SUPPORTED;
 
     const size_t newVerts = nVerts + nDupVerts;
+    if (!newVerts)
+        return E_INVALIDARG;
 
     std::unique_ptr<uint32_t[]> vertexRemapInverse;
-    if (vertexRemap) {
+    if (vertexRemap)
+    {
         vertexRemapInverse.reset(new (std::nothrow) uint32_t[newVerts]);
         if (!vertexRemapInverse)
             return E_OUTOFMEMORY;
 
         memset(vertexRemapInverse.get(), 0xff, sizeof(uint32_t) * newVerts);
 
-        for (uint32_t j = 0; j < newVerts; ++j) {
-            if (vertexRemap[j] != UNUSED32) {
+        for (uint32_t j = 0; j < newVerts; ++j)
+        {
+            if (vertexRemap[j] != UNUSED32)
+            {
                 if (vertexRemap[j] >= newVerts)
                     return E_INVALIDARG;
 
@@ -613,48 +782,63 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(
     memset(vbout, 0, newVerts * stride);
 #endif
 
-    std::unique_ptr<uint32_t[]> pointRep(new (std::nothrow) uint32_t[nVerts + nDupVerts]);
+    std::unique_ptr<uint32_t[]> pointRep(new (std::nothrow) uint32_t[newVerts]);
     if (!pointRep)
         return E_OUTOFMEMORY;
 
     memcpy(pointRep.get(), prin, sizeof(uint32_t) * nVerts);
 
-    for (size_t i = 0; i < nDupVerts; ++i) {
+    for (size_t i = 0; i < nDupVerts; ++i)
+    {
         pointRep[i + nVerts] = prin[dupVerts[i]];
     }
 
-    for (size_t j = 0; j < newVerts; ++j) {
+    for (size_t j = 0; j < newVerts; ++j)
+    {
         const uint32_t src = (vertexRemap) ? vertexRemap[j] : uint32_t(j);
 
-        if (src == UNUSED32) {
+        if (src == UNUSED32)
+        {
             // remap entry is unused
-        } else if (src >= newVerts) {
+        }
+        else if (src >= newVerts)
+        {
             return E_FAIL;
-        } else if (src < nVerts) {
+        }
+        else if (src < nVerts)
+        {
             memcpy(dptr, sptr + src * stride, stride);
 
             const uint32_t pr = pointRep[src];
-            if (pr < newVerts) {
+            if (pr < newVerts)
+            {
                 prout[j] = (vertexRemapInverse) ? vertexRemapInverse[pr] : pr;
             }
-        } else if (dupVerts) {
+        }
+        else if (dupVerts)
+        {
             const uint32_t dup = dupVerts[src - nVerts];
             memcpy(dptr, sptr + dup * stride, stride);
 
             const uint32_t pr = pointRep[src];
-            if (pr < newVerts) {
+            if (pr < newVerts)
+            {
                 prout[j] = (vertexRemapInverse) ? vertexRemapInverse[pr] : pr;
             }
-        } else
+        }
+        else
             return E_FAIL;
 
         dptr += stride;
     }
 
-    if (vertexRemap) {
+    if (vertexRemap)
+    {
         // clean up point reps for any removed vertices
-        for (uint32_t i = 0; i < newVerts; ++i) {
-            if (vertexRemap[i] == UNUSED32) {
+        for (uint32_t i = 0; i < newVerts; ++i)
+        {
+            if (vertexRemap[i] == UNUSED32)
+            {
                 pointRep[i] = UNUSED32;
             }
         }
@@ -663,9 +847,18 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(
     return S_OK;
 }
 
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
-_Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(void* vb, size_t stride, size_t nVerts, uint32_t* pointRep, const uint32_t* vertexRemap) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::FinalizeVBAndPointReps(
+    void* vb,
+    size_t stride,
+    size_t nVerts,
+    uint32_t* pointRep,
+    const uint32_t* vertexRemap) noexcept
+{
     if (nVerts >= UINT32_MAX)
         return E_INVALIDARG;
 
@@ -675,8 +868,10 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(void* vb, size_t 
     HRESULT hr = SwapVertices(vb, stride, nVerts, pointRep, vertexRemap);
 
     // clean up point reps for any removed vertices
-    for (size_t i = 0; i < nVerts; ++i) {
-        if (vertexRemap[i] == UNUSED32) {
+    for (size_t i = 0; i < nVerts; ++i)
+    {
+        if (vertexRemap[i] == UNUSED32)
+        {
             pointRep[i] = UNUSED32;
         }
     }
@@ -684,10 +879,19 @@ _Use_decl_annotations_ HRESULT DirectX::FinalizeVBAndPointReps(void* vb, size_t 
     return hr;
 }
 
+
 //-------------------------------------------------------------------------------------
 // Applies a vertex remap which contains a known number of unused entries at the end
 //-------------------------------------------------------------------------------------
-_Use_decl_annotations_ HRESULT DirectX::CompactVB(const void* vbin, size_t stride, size_t nVerts, size_t trailingUnused, const uint32_t* vertexRemap, void* vbout) noexcept {
+_Use_decl_annotations_
+HRESULT DirectX::CompactVB(
+    const void* vbin,
+    size_t stride,
+    size_t nVerts,
+    size_t trailingUnused,
+    const uint32_t* vertexRemap,
+    void* vbout) noexcept
+{
     if (!vbin || !stride || !nVerts || !vbout || !vertexRemap)
         return E_INVALIDARG;
 
@@ -704,6 +908,8 @@ _Use_decl_annotations_ HRESULT DirectX::CompactVB(const void* vbin, size_t strid
         return HRESULT_E_NOT_SUPPORTED;
 
     const size_t newVerts = nVerts - trailingUnused;
+    if (!newVerts)
+        return E_INVALIDARG;
 
     auto sptr = static_cast<const uint8_t*>(vbin);
     auto dptr = static_cast<uint8_t*>(vbout);
@@ -712,14 +918,19 @@ _Use_decl_annotations_ HRESULT DirectX::CompactVB(const void* vbin, size_t strid
     memset(vbout, 0, newVerts * stride);
 #endif
 
-    for (size_t j = 0; j < newVerts; ++j) {
+    for (size_t j = 0; j < newVerts; ++j)
+    {
         const uint32_t src = vertexRemap[j];
 
-        if (src == UNUSED32) {
+        if (src == UNUSED32)
+        {
             // remap entry is unused
-        } else if (src < nVerts) {
+        }
+        else if (src < nVerts)
+        {
             memcpy(dptr, sptr + src * stride, stride);
-        } else
+        }
+        else
             return E_FAIL;
 
         dptr += stride;
